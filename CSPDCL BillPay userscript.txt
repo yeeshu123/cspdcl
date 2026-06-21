@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         CSPDCL BillPay
 // @namespace    http://tampermonkey.net/
-// @version      3.2
-// @description  Clean UI, Auto-clicks Continue/UPI, Auto-names PDF, Smart Toast Redirect.
+// @version      3.3
+// @description  Clean UI, Auto-downloads PDF, Smart Toast Redirect.
 // @author       You
 // @match        *://cspdcl.co.in/*
 // @match        *://*.payu.in/*
+// @require      https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -16,7 +17,7 @@
     const currentUrl = window.location.href.toLowerCase();
 
     // ==========================================
-    // PHASE 1: RECEIPT PAGE (AUTO-SAVE & REDIRECT)
+    // PHASE 1: RECEIPT PAGE (AUTO-DOWNLOAD & REDIRECT)
     // ==========================================
     if (currentUrl.includes('frmmultipg_payresp.aspx')) {
 
@@ -24,17 +25,11 @@
         const savedBP = localStorage.getItem('cspdcl_bp') || 'BP_Number';
         const dateToday = new Date().toISOString().split('T')[0];
 
-        // 1. Change document title for the "Save as PDF" filename
-        document.title = `${savedName} [${savedBP}] ${dateToday}`;
+        // Define the exact filename you want
+        const pdfFilename = `${savedName} [${savedBP}] ${dateToday}.pdf`;
 
-        // Wait a split second to ensure the page has rendered visually before freezing it with Print
-        setTimeout(() => {
-
-            // 2. Trigger the Print Dialog.
-            // The browser will pause ALL script execution right here until you close the dialog.
-            window.print();
-
-            // 3. ONCE SAVED/CLOSED: Build the small, non-intrusive Toast UI
+        // Function to handle the toast and redirect AFTER the PDF downloads
+        function triggerToastAndRedirect() {
             const toast = document.createElement('div');
             toast.style.cssText = `
                 position: fixed; bottom: 24px; right: 24px;
@@ -47,7 +42,7 @@
 
             toast.innerHTML = `
                 <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <div style="font-weight: 600; font-size: 16px;">Payment Successful</div>
+                    <div style="font-weight: 600; font-size: 16px;">PDF Downloaded!</div>
                     <div style="font-size: 14px; color: #86868b;">
                         Redirecting in <span id="redirect-timer" style="font-weight: 700; color: #0066cc;">5</span>s...
                     </div>
@@ -60,7 +55,6 @@
             `;
             document.body.appendChild(toast);
 
-            // 4. Start the Countdown Logic
             let secondsLeft = 5;
             const timerEl = document.getElementById('redirect-timer');
             const cancelBtn = document.getElementById('cancelBtn');
@@ -75,7 +69,6 @@
                 }
             }, 1000);
 
-            // 5. Cancel Button Logic
             cancelBtn.addEventListener('click', () => {
                 clearInterval(countdownInterval);
                 toast.innerHTML = `
@@ -83,15 +76,36 @@
                         Redirect Canceled.
                     </div>
                 `;
-                // Remove the toast entirely after 3 seconds
                 setTimeout(() => toast.remove(), 3000);
             });
 
-            // Hover effect for the cancel button
             cancelBtn.addEventListener('mouseover', () => cancelBtn.style.background = '#e5e5ea');
             cancelBtn.addEventListener('mouseout', () => cancelBtn.style.background = '#f2f2f7');
+        }
 
-        }, 500);
+        // Wait a split second to ensure the receipt has rendered
+        setTimeout(() => {
+            // Configuration for the PDF generator
+            const element = document.body; // Targets the whole page body
+            const options = {
+                margin:       10,
+                filename:     pdfFilename,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // Generate and save the PDF, then run the redirect logic
+            html2pdf().set(options).from(element).save().then(() => {
+                triggerToastAndRedirect();
+            }).catch(err => {
+                console.error("PDF Generation failed: ", err);
+                // Fallback to print if generation fails for some reason
+                window.print();
+                triggerToastAndRedirect();
+            });
+
+        }, 800);
 
         return; // Stop script execution for the rest of the phases
     }
@@ -163,9 +177,28 @@
         const modernAmount = document.getElementById('modernAmount');
         const modernPayBtn = document.getElementById('modernPayBtn');
 
+        // --- NEW FEATURE 1: AUTO-FOCUS ---
+        // Puts the blinking cursor inside the input field immediately
+        modernAmount.focus();
+
+        // Ensure the cursor jumps to the end of the existing numbers
+        const tempValue = modernAmount.value;
+        modernAmount.value = '';
+        modernAmount.value = tempValue;
+
+        // Strip non-numbers on type
         modernAmount.addEventListener('input', function() {
             this.value = this.value.replace(/[^0-9]/g, '');
             amountEl.value = this.value;
+        });
+
+        // --- NEW FEATURE 2: PRESS ENTER TO SUBMIT ---
+        // Listens for the Enter key while typing in the amount box
+        modernAmount.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Stops the browser from reloading the page by accident
+                modernPayBtn.click();   // Programmatically clicks the blue button
+            }
         });
 
         modernPayBtn.addEventListener('click', function() {
@@ -221,7 +254,6 @@
         }
     }, 200);
 
-    // Initialize the main UI overlay slightly after page load
     setTimeout(initOverlay, 500);
 
 })();
