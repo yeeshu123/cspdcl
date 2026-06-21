@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fetch BP Bill</title>
+    <style>
+        /* CSS variables for a clean, cohesive theme */
+        :root {
+            --bg-color: #fbfbfd; /* Apple-style light gray */
+            --text-color: #1d1d1f;
+            --primary-blue: #0066cc; /* Clean, recognizable action blue */
+            --primary-hover: #0077ed;
+            --placeholder-gray: #86868b;
+        }
+
+        /* Reset and centering */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--bg-color);
+            /* Native system fonts for Apple, Google, and Windows */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-color);
+        }
+
+        /* The main pill container */
+        .search-container {
+            display: flex;
+            align-items: center;
+            background: #ffffff;
+            padding: 6px 6px 6px 20px;
+            border-radius: 999px; /* Perfect pill shape */
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); /* Soft, minimal shadow */
+            transition: box-shadow 0.3s ease;
+        }
+
+        /* Elevate shadow when user clicks into the field */
+        .search-container:focus-within {
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        }
+
+        /* Input field styling */
+        input {
+            border: none;
+            outline: none;
+            font-size: 17px;
+            width: 240px;
+            background: transparent;
+            font-family: inherit;
+            color: var(--text-color);
+        }
+
+        input::placeholder {
+            color: var(--placeholder-gray);
+            font-weight: 400;
+        }
+
+        /* Button styling */
+        button {
+            background-color: var(--primary-blue);
+            color: #ffffff;
+            border: none;
+            border-radius: 999px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            font-family: inherit;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button:active {
+            transform: scale(0.96); /* Slight squeeze effect on click */
+        }
+    </style>
+</head>
+<body>
+
+    <form id="bpForm" class="search-container">
+        <input 
+            type="text" 
+            id="bpInput" 
+            placeholder="Type 10 digit BP number" 
+            maxlength="10" 
+            autocomplete="off"
+            oninput="this.value = this.value.replace(/[^0-9]/g, '')" 
+            required
+        >
+        <button type="submit">Fetch</button>
+    </form>
+
+    <script>
+        document.getElementById('bpForm').addEventListener('submit', function(event) {
+            // Prevent the form from refreshing the page
+            event.preventDefault();
+            
+            // Get the value and trim any accidental whitespace
+            const bpNumber = document.getElementById('bpInput').value.trim();
+
+            // Validate that it is exactly 10 digits
+            if (bpNumber.length === 10) {
+                // Construct the URL
+                const targetUrl = `https://cspdcl.co.in/mb/qrpay.aspx?qrbp=${bpNumber}`;
+                
+                // Redirect in the same tab
+                window.location.href = targetUrl;
+            } else {
+                // Minimal fallback alert if user bypasses the HTML restrictions
+                alert('Please enter exactly 10 digits.');
+            }
+        });
+    </script>
+
+</body>
+</html>
