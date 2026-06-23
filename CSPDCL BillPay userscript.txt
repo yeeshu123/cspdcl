@@ -1,12 +1,11 @@
 // ==UserScript==
 // @name         CSPDCL BillPay
 // @namespace    http://tampermonkey.net/
-// @version      3.3
-// @description  Clean UI, Auto-downloads PDF, Smart Toast Redirect.
+// @version      3.4
+// @description  Clean UI, Native Print to PDF, Smart Toast Redirect.
 // @author       You
 // @match        *://cspdcl.co.in/*
 // @match        *://*.payu.in/*
-// @require      https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -26,13 +25,14 @@
         const dateToday = new Date().toISOString().split('T')[0];
 
         // Define the exact filename you want
-        const pdfFilename = `${savedName} [${savedBP}] ${dateToday}.pdf`;
+        const pdfFilename = `${savedName} [${savedBP}] ${dateToday}`;
 
         // Function to handle the toast and redirect AFTER the PDF downloads
         function triggerToastAndRedirect() {
             const toast = document.createElement('div');
             toast.style.cssText = `
-                position: fixed; bottom: 24px; right: 24px;
+                position: fixed;
+                bottom: 24px; right: 24px;
                 background: #ffffff; padding: 20px; border-radius: 16px;
                 box-shadow: 0 8px 30px rgba(0,0,0,0.12); z-index: 999999;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -58,7 +58,6 @@
             let secondsLeft = 5;
             const timerEl = document.getElementById('redirect-timer');
             const cancelBtn = document.getElementById('cancelBtn');
-
             const countdownInterval = setInterval(() => {
                 secondsLeft--;
                 timerEl.innerText = secondsLeft;
@@ -68,7 +67,6 @@
                     window.location.href = "https://yeeshu123.github.io/cspdcl";
                 }
             }, 1000);
-
             cancelBtn.addEventListener('click', () => {
                 clearInterval(countdownInterval);
                 toast.innerHTML = `
@@ -78,35 +76,23 @@
                 `;
                 setTimeout(() => toast.remove(), 3000);
             });
-
             cancelBtn.addEventListener('mouseover', () => cancelBtn.style.background = '#e5e5ea');
             cancelBtn.addEventListener('mouseout', () => cancelBtn.style.background = '#f2f2f7');
         }
 
         // Wait a split second to ensure the receipt has rendered
         setTimeout(() => {
-            // Configuration for the PDF generator
-            const element = document.body; // Targets the whole page body
-            const options = {
-                margin:       10,
-                filename:     pdfFilename,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
 
-            // Generate and save the PDF, then run the redirect logic
-            html2pdf().set(options).from(element).save().then(() => {
-                triggerToastAndRedirect();
-            }).catch(err => {
-                console.error("PDF Generation failed: ", err);
-                // Fallback to print if generation fails for some reason
-                window.print();
-                triggerToastAndRedirect();
-            });
+            // Set document title so the native print dialog uses it as the default PDF filename
+            document.title = pdfFilename;
+
+            // Trigger the native browser print dialog (User can choose 'Save to PDF')
+            window.print();
+
+            // Once the print dialog is closed (saved or canceled), trigger the redirect
+            triggerToastAndRedirect();
 
         }, 800);
-
         return; // Stop script execution for the rest of the phases
     }
 
@@ -119,7 +105,6 @@
         const bpEl = document.getElementById('lblBPNO');
         const amountEl = document.getElementById('txtAmount');
         const payBtnEl = document.getElementById('btnShowConfirm');
-
         if (!nameEl || !bpEl || !amountEl || !payBtnEl) return;
 
         localStorage.setItem('cspdcl_name', nameEl.innerText.trim());
@@ -127,46 +112,66 @@
 
         const overlay = document.createElement('div');
         overlay.id = 'aesthetic-ui-overlay';
-
         const style = document.createElement('style');
         style.innerHTML = `
             #aesthetic-ui-overlay {
-                position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                position: fixed;
+                top: 0; left: 0; width: 100vw; height: 100vh;
                 background-color: #fbfbfd; z-index: 999999; display: flex;
                 justify-content: center; align-items: center;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1d1d1f;
             }
-            .modern-card { background: #ffffff; padding: 48px 40px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08); width: 100%; max-width: 420px; text-align: center; display: flex; flex-direction: column; gap: 28px; }
-            .data-group { display: flex; flex-direction: column; gap: 8px; }
-            .label { font-size: 13px; color: #86868b; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
-            .value.name { font-size: 26px; font-weight: 700; color: #1d1d1f; line-height: 1.2; }
-            .value.bp { font-size: 20px; font-weight: 500; color: #515154; }
-            .amount-container { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; }
-            .currency-symbol { font-size: 32px; font-weight: 600; color: #1d1d1f; }
-            #modernAmount { border: none; background: #f5f5f7; border-radius: 16px; padding: 12px 20px; font-size: 36px; font-weight: 700; text-align: center; width: 180px; outline: none; color: #1d1d1f; font-family: inherit; transition: all 0.2s ease; box-shadow: 0 0 0 2px transparent; }
-            #modernAmount:focus { background: #ffffff; box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.15); }
-            #modernPayBtn { background-color: #0066cc; color: #ffffff; border: none; border-radius: 999px; padding: 18px 32px; font-size: 18px; font-weight: 600; cursor: pointer; transition: background-color 0.2s ease, transform 0.1s ease; width: 100%; margin-top: 16px; font-family: inherit; }
-            #modernPayBtn:hover { background-color: #0077ed; }
-            #modernPayBtn:active { transform: scale(0.96); }
-            #modernPayBtn:disabled { background-color: #a1c4e8; cursor: not-allowed; transform: none; }
+            .modern-card { background: #ffffff;
+            padding: 48px 40px; border-radius: 24px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08); width: 100%; max-width: 420px; text-align: center;
+            display: flex; flex-direction: column; gap: 28px; }
+            .data-group { display: flex;
+            flex-direction: column; gap: 8px; }
+            .label { font-size: 13px;
+            color: #86868b; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+            .value.name { font-size: 26px;
+            font-weight: 700; color: #1d1d1f; line-height: 1.2; }
+            .value.bp { font-size: 20px;
+            font-weight: 500; color: #515154; }
+            .amount-container { display: flex;
+            align-items: center; justify-content: center; gap: 8px; margin-top: 8px; }
+            .currency-symbol { font-size: 32px;
+            font-weight: 600; color: #1d1d1f; }
+            #modernAmount { border: none;
+            background: #f5f5f7; border-radius: 16px; padding: 12px 20px; font-size: 36px; font-weight: 700; text-align: center; width: 180px; outline: none; color: #1d1d1f;
+            font-family: inherit; transition: all 0.2s ease; box-shadow: 0 0 0 2px transparent;
+            }
+            #modernAmount:focus { background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.15); }
+            #modernPayBtn { background-color: #0066cc;
+            color: #ffffff; border: none; border-radius: 999px; padding: 18px 32px; font-size: 18px; font-weight: 600; cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease; width: 100%; margin-top: 16px; font-family: inherit;
+            }
+            #modernPayBtn:hover { background-color: #0077ed;
+            }
+            #modernPayBtn:active { transform: scale(0.96);
+            }
+            #modernPayBtn:disabled { background-color: #a1c4e8; cursor: not-allowed; transform: none;
+            }
         `;
         document.head.appendChild(style);
-
         overlay.innerHTML = `
             <div class="modern-card">
                 <div class="data-group">
                     <div class="label">Consumer Name</div>
                     <div class="value name">${nameEl.innerText.trim()}</div>
                 </div>
+
                 <div class="data-group">
                     <div class="label">BP Number</div>
                     <div class="value bp">${bpEl.innerText.trim()}</div>
                 </div>
                 <div class="data-group">
+
                     <div class="label">Amount Payable</div>
                     <div class="amount-container">
                         <span class="currency-symbol">₹</span>
                         <input type="text" id="modernAmount" value="${amountEl.value.trim()}" autocomplete="off">
+
                     </div>
                 </div>
                 <button id="modernPayBtn">Pay Now</button>
@@ -180,7 +185,6 @@
         // --- NEW FEATURE 1: AUTO-FOCUS ---
         // Puts the blinking cursor inside the input field immediately
         modernAmount.focus();
-
         // Ensure the cursor jumps to the end of the existing numbers
         const tempValue = modernAmount.value;
         modernAmount.value = '';
@@ -191,16 +195,15 @@
             this.value = this.value.replace(/[^0-9]/g, '');
             amountEl.value = this.value;
         });
-
         // --- NEW FEATURE 2: PRESS ENTER TO SUBMIT ---
         // Listens for the Enter key while typing in the amount box
         modernAmount.addEventListener('keydown', function(event) {
             if (event.key === 'Enter') {
                 event.preventDefault(); // Stops the browser from reloading the page by accident
-                modernPayBtn.click();   // Programmatically clicks the blue button
+                modernPayBtn.click();   //
+                // Programmatically clicks the blue button
             }
         });
-
         modernPayBtn.addEventListener('click', function() {
             if (modernAmount.value === '' || parseInt(modernAmount.value) <= 0) {
                 alert("Please enter a valid amount.");
@@ -208,9 +211,9 @@
             }
             this.innerText = 'Processing...';
             this.disabled = true;
+
             payBtnEl.click();
         });
-
         const initialUrl = window.location.href;
         const urlCheckInterval = setInterval(() => {
             if (window.location.href !== initialUrl) {
@@ -233,6 +236,7 @@
                 continueBtn.click();
                 continueClicked = true;
             }
+
         }
 
         if (!upiClicked) {
@@ -240,10 +244,12 @@
             for (let p of paragraphs) {
                 if (p.textContent.trim() === 'UPI') {
                     const upiContainer = p.closest('li') || p.closest('.l1Item');
+
                     if (upiContainer) {
                         upiContainer.click();
                         upiClicked = true;
                         break;
+
                     }
                 }
             }
@@ -253,7 +259,6 @@
             clearInterval(autoClickerInterval);
         }
     }, 200);
-
     setTimeout(initOverlay, 500);
 
 })();
